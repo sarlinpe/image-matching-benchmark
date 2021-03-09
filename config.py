@@ -106,6 +106,7 @@ arg.add_argument('--path_pack',
                  type=str,
                  default='',
                  help='Directory holding benchmark results.')
+
 arg.add_argument(
     '--vis_th',
     type=float,
@@ -170,6 +171,11 @@ arg.add_argument('--run_viz',
                  default=True,
                  help=''
                  'Turn this on to generate visualization data')
+arg.add_argument('--run_viz_debug',
+                 type=str2bool,
+                 default=False,
+                 help=''
+                 'Turn this on to generate visualization data for debugging')
 arg.add_argument(
     '--skip_packing',
     type=str2bool,
@@ -181,6 +187,11 @@ arg.add_argument('--num_viz_stereo_pairs',
                  type=int,
                  default=10,
                  help='Number of stereo pairs to visualize (per scene)')
+arg.add_argument(
+    '--num_viz_stereo_pairs_debug',
+    type=int,
+    default=200,
+    help='Number of stereo pairs to visualize (per scene, for debugging)')
 arg.add_argument('--max_num_images_viz_multiview',
                  type=int,
                  default=10,
@@ -269,6 +280,10 @@ for dataset in ['phototourism']:
                          type=str,
                          default='',
                          help='')
+arg.add_argument('--json_deprecated_images',
+                 type=str,
+                 default="",
+                 help="JSON file containing deprecated images")
 
 
 def validate_method(method, is_challenge):
@@ -293,6 +308,10 @@ def validate_method(method, is_challenge):
             Optional('link_to_website'):
             str,
             Optional('link_to_pdf'):
+            str,
+            Optional('under_review'):
+            bool,
+            Optional('under_review_override'):
             str,
         },
         'config_common': {
@@ -451,9 +470,11 @@ def validate_method(method, is_challenge):
             if method[cur_key] and ('use_custom_matches' in method[cur_key]) \
                     and method[cur_key]['use_custom_matches']:
 
-                if 'matcher' in method[cur_key] or 'outlier_filter' in method[cur_key]:
-                    raise ValueError('Cannot specify a matcher or outlier filter with '
-                                     'use_custom_matches=True')
+                if 'matcher' in method[cur_key] or 'outlier_filter' in method[
+                        cur_key]:
+                    raise ValueError(
+                        'Cannot specify a matcher or outlier filter with '
+                        'use_custom_matches=True')
 
             # Matcher and filter
             if 'matcher' in method[cur_key]:
@@ -465,26 +486,27 @@ def validate_method(method, is_challenge):
                         .format(dataset, task))
 
                 # Check for redundant settings with custom matches
-                cur_config = method['config_{}_stereo'.format(dataset)]
-                if cur_config['use_custom_matches']:
-                    if 'matcher' in cur_config or 'outlier_filter' in cur_config \
-                            or 'geom' in cur_config:
-                        raise ValueError(
-                            '[{}/stereo] Found redundant settings with use_custom_matches=True'
-                            .format(dataset))
-                else:
-                    if 'matcher' not in cur_config or 'outlier_filter' not in \
-                            cur_config or 'geom' not in cur_config:
-                        raise ValueError(
-                            '[{}/stereo] Missing required settings with use_custom_matches=False'
-                            .format(dataset))
+                if 'config_{}_stereo'.format(dataset) in method:
+                    cur_config = method['config_{}_stereo'.format(dataset)]
+                    if cur_config['use_custom_matches']:
+                        if 'matcher' in cur_config or 'outlier_filter' in cur_config \
+                                or 'geom' in cur_config:
+                            raise ValueError(
+                                '[{}/stereo] Found redundant settings with use_custom_matches=True'
+                                .format(dataset))
+                    else:
+                        if 'matcher' not in cur_config or 'outlier_filter' not in \
+                                cur_config or 'geom' not in cur_config:
+                            raise ValueError(
+                                '[{}/stereo] Missing required settings with use_custom_matches=False'
+                                .format(dataset))
 
-                if cur_config['use_custom_matches']:
-                    if 'matcher' in cur_config or 'outlier_filter' in cur_config \
-                            or 'geom' in cur_config:
-                        raise ValueError(
-                            '[{}/stereo] Found redundant settings with use_custom_matches=True'
-                        )
+                    if cur_config['use_custom_matches']:
+                        if 'matcher' in cur_config or 'outlier_filter' in cur_config \
+                                or 'geom' in cur_config:
+                            raise ValueError(
+                                '[{}/stereo] Found redundant settings with use_custom_matches=True'
+                            )
 
             # For stereo, check also geom
             if task == 'stereo' and \
@@ -605,6 +627,11 @@ def get_config():
               'packed-debug')
         cfg.path_pack = 'packed-debug'
 
+    # Overwrite deprecated images json path -- unless already overwritten
+    # TODO: This is a bit fragile -- fix it next time around
+    if not cfg.json_deprecated_images:
+        cfg.json_deprecated_images = 'json/deprecated_images.json'
+
     # Enforce challenge settings
     if cfg.is_challenge:
         if cfg.num_runs_test_stereo != 3 or \
@@ -614,7 +641,7 @@ def get_config():
 
     # "Ignore" walltime on Google Cloud Compute and change some defaults
     if get_cluster_name() == 'gcp' and cfg.run_mode == 'batch':
-        cfg.cc_time = '12:00:00'
+        cfg.cc_time = '32:00:00'
         cfg.num_opencv_threads = 2
         cfg.cc_account = 'default'
 
