@@ -15,7 +15,7 @@
 import os
 import cv2
 import numpy as np
-from utils.io_helper import load_h5
+from .io_helper import load_h5
 
 
 def load_image(image_path,

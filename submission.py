@@ -69,8 +69,8 @@ if __name__ == '__main__':
             'method': 'cv2-8pt'
         }
         est = label.split('_')[-1]
-        method['config_phototourism_stereo']['custom_matches_name'] += est
-        method['config_phototourism_multiview']['custom_matches_name'] += est
+        method['config_phototourism_stereo']['custom_matches_name'] += ('-'+est)
+        method['config_phototourism_multiview']['custom_matches_name'] += ('-'+est)
 
         with open(export_root / 'config_{}.json'.format(label), 'w') as f:
             json.dump(method, f, indent=2)

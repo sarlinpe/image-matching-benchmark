@@ -192,15 +192,21 @@ def main(cfg):
 
         # Plot matches on points without depth
         for idx in range(len(zero_index)):
-            plt.plot(
+            plt.scatter(
                 (kp1_inl[idx, 0] + h_offset[0], kp2_inl[idx, 0] + h_offset[1]),
                 (kp1_inl[idx, 1] + v_offset[0], kp2_inl[idx, 1] + v_offset[1]),
-                color='b',
-                linewidth=linewidth)
+                color='b', s=1)
+            plt.plot(
+                (kp1_inl[idx, 0] + h_offset[0], kp2_inl[idx, 0] + h_offset[1]),
+                 (kp1_inl[idx, 1] + v_offset[0], kp2_inl[idx, 1] + v_offset[1]),
+                 color='b', linewidth=linewidth, alpha=0.4)
 
         # Plot matches on points with depth
         max_dist = 5
-        cmap = matplotlib.cm.get_cmap('summer')
+        # cmap = matplotlib.cm.get_cmap('summer')
+        def cmap(x):
+            return (x/255., 1., 0., 1.)
+
         order = list(range(len(true_d)))
         random.shuffle(order)
         for idx in order:
@@ -213,12 +219,18 @@ def main(cfg):
                 # col = cmap(255 * (max_dist - true_d[idx]) / max_dist)
             else:
                 col = 'r'
+            plt.scatter(
+                (kp1_inl_nonzero[idx, 0] + h_offset[0],
+                 kp2_inl_nonzero[idx, 0] + h_offset[1]),
+                (kp1_inl_nonzero[idx, 1] + v_offset[0],
+                 kp2_inl_nonzero[idx, 1] + v_offset[1]),
+                color=col, s=1)
             plt.plot((kp1_inl_nonzero[idx, 0] + h_offset[0],
                       kp2_inl_nonzero[idx, 0] + h_offset[1]),
                      (kp1_inl_nonzero[idx, 1] + v_offset[0],
                       kp2_inl_nonzero[idx, 1] + v_offset[1]),
                      color=col,
-                     linewidth=linewidth)
+                     linewidth=linewidth, alpha=0.3)
 
         plt.tight_layout()
         plt.axis('off')
