@@ -313,7 +313,7 @@ def get_cne_temp_path(cfg):
     return os.path.join(get_filter_path(cfg), 'temp_cne')
 
 def get_filter_match_file_for_computing_model(cfg):
-    filter_match_file = os.path.join(get_filter_path(cfg), 
+    filter_match_file = os.path.join(get_filter_path(cfg),
         'matches_imported_stereo_{}.h5'.format(cfg.run))
     if os.path.isfile(filter_match_file):
         return filter_match_file
@@ -410,15 +410,23 @@ def get_stereo_depth_projection_final_match_file(cfg, th=None):
 def get_colmap_path(cfg):
     '''Returns the path to colmap results for individual bag.'''
 
-    return os.path.join(get_multiview_path(cfg),
+    path = os.path.join(get_multiview_path(cfg),
                         'bag_size_{}'.format(cfg.bag_size),
                         'bag_id_{:05d}'.format(cfg.bag_id))
+
+    cur_key = 'config_{}_multiview'.format(cfg.dataset)
+    if cfg.method_dict[cur_key].get('refinement', {}).get('enabled', False):
+        path = os.path.join(
+            path, 'refined_' + cfg.method_dict[cur_key]['refinement']['label'])
+    return path
+
 
 def get_multiview_path(cfg):
     '''Returns the path to multiview folder.'''
 
     return os.path.join(get_filter_path(cfg),
                         'multiview-fold-{}'.format(cfg.run))
+
 
 def get_colmap_mark_file(cfg):
     '''Returns the path to colmap flag.'''

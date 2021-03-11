@@ -424,6 +424,10 @@ def validate_method(method, is_challenge):
                 And(Use(str), lambda v: v.lower() in ['none', 'cne-bp-nd']),
             },
             Optional('colmap'): {},
+            Optional('refinement'): {
+                'enabled': bool,
+                Optional('label'): str,
+            },
         },
         Optional('config_phototourism_relocalization'): {},
     })

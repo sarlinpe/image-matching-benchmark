@@ -16,6 +16,7 @@ import multiprocessing
 import os
 import subprocess
 from shutil import copyfile, rmtree
+from copy import deepcopy
 
 import numpy as np
 from joblib import Parallel, delayed
@@ -33,7 +34,8 @@ from utils.match_helper import compute_image_pairs
 from utils.path_helper import (get_colmap_output_path, get_colmap_pose_file,
                                get_colmap_temp_path, get_item_name_list,
                                get_kp_file, get_match_file, get_fullpath_list,
-                               get_data_path, get_filter_match_file)
+                               get_data_path, get_filter_match_file,
+                               get_colmap_path)
 
 
 def compute_pose_error(cfg):
@@ -97,6 +99,54 @@ def compute_pose_error(cfg):
     save_h5(err_dict, get_colmap_pose_file(cfg))
 
 
+def run_refinement_for_bag(cfg, refiner_dict):
+    refine_path = get_colmap_path(cfg)
+    os.makedirs(refine_path, exist_ok=True)
+
+    initial_output_path = os.path.abspath(
+            os.path.join(refine_path, '../colmap/'))
+    is_colmap_valid = os.path.exists(os.path.join(initial_output_path, '0'))
+    if not is_colmap_valid:
+        print(f'No SfM model found at {initial_output_path}')
+        return
+
+    best_index = get_best_colmap_index(cfg, initial_output_path)
+    initial_model = os.path.join(initial_output_path, str(best_index))
+
+    refine_output_path = get_colmap_output_path(cfg)
+    if os.path.exists(refine_output_path):
+        print(' -- already exists, skipping refine session')
+        return
+    output_model = os.path.join(refine_output_path, str(best_index))
+    os.makedirs(output_model)
+    image_path = os.path.join(get_data_path(cfg), 'images')
+
+    refiner_path = os.path.join(root, 'build/fmcolmap')
+    cache_dir = os.path.join(root, 'cache', cfg.dataset, cfg.scene)
+    if not os.path.exists(cache_dir):
+        raise RuntimeError(f'Cache does not exists at {cache_dir}')
+    os.environ['TMPDIR'] = str(cache_dir)
+
+    refiner_args = {
+    }
+    cmd = [
+        '--image_path', str(image_path),
+        '--input_path', str(initial_model),
+        '--output_path', str(output_model),
+        '--Featuremap.cache_path', str(cache_dir),
+        '--Featuremap.load_from_cache', '1',
+        '--Featuremap.write_to_cache', '0',
+    ]
+    args = refiner_args[refiner_dict['label']]
+    cmd += [x for kv in args.items() for x in kv]
+    print('Refinement arguments:\n' + (' '.join(cmd)))
+
+    ret = subprocess.call(cmd)
+    if ret != 0:
+        rmtree(refine_output_path)
+        raise RuntimeError('Problem with the refiner, exiting.')
+
+
 def run_colmap_for_bag(cfg):
     '''Runs colmap to retrieve poses for each bag'''
 
@@ -105,13 +155,19 @@ def run_colmap_for_bag(cfg):
         print(' -- already exists, skipping COLMAP eval')
         return
 
+    cur_key = 'config_{}_multiview'.format(cfg.dataset)
+    refiner_dict = cfg.method_dict[cur_key].get('refinement', {})
+    if refiner_dict.get('enabled', False):
+        print(' -- running refinement instead of COLMAP')
+        return run_refinement_for_bag(cfg, refiner_dict)
+
     # Load keypoints and matches
     keypoints_dict = load_h5(get_kp_file(cfg))
 
     matches_dict = load_h5(get_filter_match_file(cfg))
 
     print('Running COLMAP on bagsize {} -- bag {}'.format(
-        cfg.scene, cfg.bag_size, cfg.bag_id))
+        cfg.bag_size, cfg.bag_id))
 
     # Additional sanity check to account for crash -- in this case colmap temp
     # directory can exist. This in an indication that you need to remove

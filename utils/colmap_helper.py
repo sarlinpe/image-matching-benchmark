@@ -30,7 +30,7 @@ def valid_bag(cfg_bag, deprecated_images):
     # skip if bag contain deprecated image
     if len(list(set(image_name_list) & set(deprecated_images)))!=0:
         return False
-    return True 
+    return True
 
 def is_colmap_complete(cfg):
     '''Checks if stereo evaluation is complete.'''
@@ -115,12 +115,13 @@ def get_colmap_calib_list(cfg):
     return calib_list
 
 
-def get_best_colmap_index(cfg):
+def get_best_colmap_index(cfg, colmap_output_path=None):
     '''
     Determines the colmap model with the most images if there is more than one.
     '''
 
-    colmap_output_path = get_colmap_output_path(cfg)
+    if colmap_output_path is None:
+        colmap_output_path = get_colmap_output_path(cfg)
 
     # First find the colmap reconstruction with the most number of images.
     best_index, best_num_images = -1, 0
