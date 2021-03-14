@@ -222,6 +222,12 @@ def get_match_file(cfg):
     return os.path.join(get_match_path(cfg), 'matches.h5')
 
 
+def get_match_similarity_file(cfg):
+    '''Returns the path to the match file.'''
+
+    return os.path.join(get_match_path(cfg), 'similarities.h5')
+
+
 def get_match_cost_file(cfg):
     '''Returns the path to the match file.'''
 
@@ -415,9 +421,12 @@ def get_colmap_path(cfg):
                         'bag_id_{:05d}'.format(cfg.bag_id))
 
     cur_key = 'config_{}_multiview'.format(cfg.dataset)
-    if cfg.method_dict[cur_key].get('refinement', {}).get('enabled', False):
-        path = os.path.join(
-            path, 'refined_' + cfg.method_dict[cur_key]['refinement']['label'])
+    bundle_ref = cfg.method_dict[cur_key].get('bundle_refinement', {})
+    kp_ref = cfg.method_dict[cur_key].get('keypoint_refinement', {})
+    if kp_ref.get('enabled', False):
+        path = os.path.join(path, 'colmap_kptref_' + kp_ref['label'])
+    if bundle_ref.get('enabled', False):
+        path = os.path.join(path, 'refined_' + bundle_ref['label'])
     return path
 
 
@@ -434,23 +443,29 @@ def get_colmap_mark_file(cfg):
     return os.path.join(get_colmap_path(cfg), 'colmap_has_run')
 
 
-def get_colmap_pose_file(cfg):
+def get_colmap_pose_file(cfg, parent=None):
     '''Returns the path to colmap pose files.'''
 
-    return os.path.join(get_colmap_path(cfg), 'colmap_pose_errors.h5')
+    if parent is None:
+        parent = get_colmap_path(cfg)
+    return os.path.join(parent, 'colmap_pose_errors.h5')
 
 
-def get_colmap_output_path(cfg):
+def get_colmap_output_path(cfg, parent=None):
     '''Returns the path to colmap outputs.'''
 
-    return os.path.join(get_colmap_path(cfg), 'colmap')
+    if parent is None:
+        parent = get_colmap_path(cfg)
+    return os.path.join(parent, 'colmap')
 
 
-def get_colmap_temp_path(cfg):
+def get_colmap_temp_path(cfg, parent=None):
     '''Returns the path to colmap working path.'''
 
     # TODO: Do we want to use slurm temp directory?
-    return os.path.join(get_colmap_path(cfg), 'temp_colmap')
+    if parent is None:
+        parent = get_colmap_path(cfg)
+    return os.path.join(parent, 'temp_colmap')
 
 
 def parse_file_to_list(file_name, data_dir):
