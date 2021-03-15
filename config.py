@@ -383,7 +383,11 @@ def validate_method(method, is_challenge):
                     lambda v: v.lower() in ['sampson', 'symm_epipolar']),
                 Optional('degeneracy_check'):
                 bool,
-            }
+            },
+            Optional('keypoint_refinement'): {
+                'enabled': bool,
+                'label': And(Use(str), lambda v: len(v) > 0),
+            },
         },
         Optional('config_phototourism_multiview'): {
             Optional('use_custom_matches'): bool,

@@ -24,7 +24,8 @@ from methods import feature_matching as matching
 from utils.io_helper import load_h5, save_h5
 from utils.path_helper import (get_data_path, get_desc_file, get_kp_file,
                                get_match_file, get_match_path,
-                               get_match_cost_file, get_pairs_per_threshold)
+                               get_match_cost_file, get_pairs_per_threshold,
+                               get_match_similarity_file)
 import cv2
 WITH_FAISS=False
 try:
@@ -56,11 +57,10 @@ def compute_matches(descs1, descs2, cfg, kps1=None, kps2=None):
     # Get matches through the matching module defined in the function argument
     method_match = cfg.method_dict['config_{}_{}'.format(
         cfg.dataset, cfg.task)]['matcher']['method']
-    matches, ellapsed = getattr(matching,
-                                method_match).match(descs1, descs2, cfg, kps1,
-                                                    kps2)
+    matches, ellapsed, similarities = getattr(
+            matching, method_match).match(descs1, descs2, cfg, kps1, kps2)
 
-    return matches, ellapsed
+    return matches, ellapsed, similarities
 
 
 def main(cfg):
@@ -104,10 +104,12 @@ def main(cfg):
 
     # Make match dictionary
     matches_dict = {}
+    similarities_dict = {}
     timings_list = []
-    for i, pair in enumerate(pairs):
-        matches_dict[pair] = result[i][0]
-        timings_list.append(result[i][1])
+    for pair, (matches, timings, similarities) in zip(pairs, result):
+        matches_dict[pair] = matches
+        timings_list.append(timings)
+        similarities_dict[pair] = similarities
 
     # Check match directory
     if not os.path.exists(get_match_path(cfg)):
@@ -115,6 +117,7 @@ def main(cfg):
 
     # Finally save packed matches
     save_h5(matches_dict, get_match_file(cfg))
+    save_h5(similarities_dict, get_match_similarity_file(cfg))
 
     # Save computational cost
     save_h5({'cost': np.mean(timings_list)}, get_match_cost_file(cfg))

@@ -223,7 +223,7 @@ def get_match_file(cfg):
 
 
 def get_match_similarity_file(cfg):
-    '''Returns the path to the match file.'''
+    '''Returns the path to the similarity file.'''
 
     return os.path.join(get_match_path(cfg), 'similarities.h5')
 
@@ -288,6 +288,11 @@ def get_geom_name(cfg):
     else:
         raise ValueError('Unknown method for E/F estimation')
 
+    cur_key = 'config_{}_{}'.format(cfg.dataset, cfg.task)
+    kp_ref = cfg.method_dict[cur_key].get('keypoint_refinement', {})
+    if kp_ref.get('enabled', False):
+        label += '_refine-' + kp_ref['label']
+
     return label.lower()
 
 
@@ -328,6 +333,10 @@ def get_filter_match_file_for_computing_model(cfg):
 
 def get_filter_match_file(cfg):
     return os.path.join(get_filter_path(cfg), 'matches_inlier.h5')
+
+
+def get_filter_similarity_file(cfg):
+    return os.path.join(get_filter_path(cfg), 'similarities_inlier.h5')
 
 
 def get_filter_cost_file(cfg):

@@ -30,7 +30,9 @@ from utils.load_helper import load_calib
 from utils.path_helper import (get_data_path, get_fullpath_list,
                                get_match_file, get_kp_file, get_cne_temp_path,
                                get_cne_data_dump_path, get_filter_match_file,
-                               get_filter_path, get_filter_cost_file)
+                               get_filter_path, get_filter_cost_file,
+                               get_match_similarity_file,
+                               get_filter_similarity_file)
 from utils.queue_helper import create_sh_cmd
 
 
@@ -194,7 +196,7 @@ def get_cne_config():
 
 def cne_interface(sfm_cfg):
     """Entry point to refine matches with CNe.
-    
+
     Parameters
     ----------
     sfm_cfg: Config.
@@ -248,6 +250,7 @@ if __name__ == '__main__':
         cne_interface(cfg)
     elif cur_filter['method'] == 'none':
         copyfile(get_match_file(cfg), get_filter_match_file(cfg))
+        copyfile(get_match_similarity_file(cfg), get_filter_similarity_file(cfg))
         save_h5({'cost': 0.0}, get_filter_cost_file(cfg))
     else:
         raise ValueError('Unknown prefilter type')

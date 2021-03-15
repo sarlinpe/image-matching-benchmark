@@ -178,6 +178,8 @@ def match(desc1, desc2, cfg, kps1=None, kps2=None):
     for m in valid_matches:
         matches_list.append([m.queryIdx, m.trainIdx])
     matches = np.asarray(matches_list).T
+    match_to_dist = {
+            (m.queryIdx, m.trainIdx): m.distance for m in valid_matches}
 
     # If two-way matching is enabled
     if method_match['symmetric']['enabled']:
@@ -187,7 +189,7 @@ def match(desc1, desc2, cfg, kps1=None, kps2=None):
         cfg_temp = deepcopy(cfg)
         cfg_temp.method_dict['config_{}_{}'.format(
             cfg.dataset, cfg.task)]['matcher']['symmetric']['enabled'] = False
-        matches_other_direction, ellapsed_other_direction = match(
+        matches_other_direction, ellapsed_other_direction, _ = match(
             desc2, desc1, cfg_temp, kps2, kps1)
 
         if reduce_method == 'any':
@@ -222,5 +224,6 @@ def match(desc1, desc2, cfg, kps1=None, kps2=None):
 
     # Remove duplicate matches
     matches = remove_duplicate_matches(matches, kps1, kps2)
-
-    return matches, time() - t_start + ellapsed_other_direction
+    dists = np.array([match_to_dist[tuple(m)] for m in matches.T])
+    similarities = 1 - dists**2 / 2
+    return matches, time() - t_start + ellapsed_other_direction, similarities

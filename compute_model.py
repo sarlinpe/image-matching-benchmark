@@ -31,6 +31,7 @@ from utils.path_helper import (
     get_item_name_list, get_geom_file, get_match_file,
     get_filter_match_file_for_computing_model, get_geom_path,
     get_geom_cost_file, get_pairs_per_threshold)
+from refinement import run_keypoint_refinement
 import cv2
 
 
@@ -107,11 +108,20 @@ def main(cfg):
         print(' -- already exists, skipping model computation')
         return
 
-    # Get data directory
-    keypoints_dict = load_h5(get_kp_file(cfg))
-
     # Load keypoints and matches
+    keypoints_dict = load_h5(get_kp_file(cfg))
     matches_dict = load_h5(get_filter_match_file_for_computing_model(cfg))
+
+    # Check model directory
+    geom_path = get_geom_path(cfg)
+    if not os.path.exists(geom_path):
+        os.makedirs(geom_path)
+
+    cur_key = 'config_{}_{}'.format(cfg.dataset, cfg.task)
+    refiner_dict = cfg.method_dict[cur_key].get('keypoint_refinement', {})
+    if refiner_dict.get('enabled', False):
+        keypoints_dict = run_keypoint_refinement(
+            cfg, geom_path, keypoints_dict, matches_dict)
 
     # Feature Matching
     print('Computing model')
@@ -130,12 +140,12 @@ def main(cfg):
     try:
         desc_dict = defaultdict(list)
         desc_dict1 = load_h5(get_desc_file(cfg))
-        for k, v in desc_dict.items():
+        for k, v in desc_dict1.items():
             desc_dict[k] = v
     except Exception:
         desc_dict = defaultdict(list)
 
-    
+
     try:
         aff_dict = defaultdict(list)
         aff_dict1 = load_h5(get_affine_file(cfg))
@@ -185,10 +195,6 @@ def main(cfg):
         model_dict[pair] = result[i][0]
         inl_dict[pair] = result[i][1]
         timings_list.append(result[i][2])
-
-    # Check model directory
-    if not os.path.exists(get_geom_path(cfg)):
-        os.makedirs(get_geom_path(cfg))
 
     # Finally save packed models
     save_h5(model_dict, get_geom_file(cfg))
