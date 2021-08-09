@@ -399,6 +399,7 @@ def validate_method(method, is_challenge):
             Optional('keypoint_refinement'): {
                 'enabled': bool,
                 'label': And(Use(str), lambda v: len(v) > 0),
+                Optional('num_levels'): int,
             },
         },
         Optional('config_phototourism_multiview'): {
@@ -443,10 +444,12 @@ def validate_method(method, is_challenge):
             Optional('bundle_refinement'): {
                 'enabled': bool,
                 'label': And(Use(str), lambda v: len(v) > 0),
+                Optional('num_levels'): int,
             },
             Optional('keypoint_refinement'): {
                 'enabled': bool,
                 'label': And(Use(str), lambda v: len(v) > 0),
+                Optional('num_levels'): int,
             },
         },
         Optional('config_phototourism_relocalization'): {},

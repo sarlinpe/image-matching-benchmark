@@ -63,8 +63,9 @@ def run_bundle_refinement_for_bag(cfg, refiner_dict, initial_output_path):
         '--Featuremap.load_from_cache', '1',
         '--Featuremap.write_to_cache', '0',
     ]
-    args = refiner_args[refiner_dict['label']]
+    args = refiner_args['default']
     cmd += [x for kv in args.items() for x in kv]
+    cmd = list(map(str, cmd))
     print('Refinement arguments:\n' + (' '.join(cmd)))
 
     ret = subprocess.call(cmd)
@@ -96,7 +97,7 @@ def create_refiner_keypoint_file(imw_keypoints, path):
             h5f.create_dataset(name + '.jpg', data=kpts, dtype="float64")
 
 
-def run_keypoint_refinement(cfg, output_dir,
+def run_keypoint_refinement(cfg, refiner_dict, output_dir,
                             raw_keypoints_dict, matches_dict,
                             image_subset=None):
     similarity_path = get_filter_similarity_file(cfg)
@@ -134,7 +135,7 @@ def run_keypoint_refinement(cfg, output_dir,
         '--cache_file', cache_file,
         '--output_file', ref_keypoints_path,
         '--n_threads', 12,
-        '--n_levels', 2,
+        '--n_levels', refiner_dict.get('num_levels', 1),
         '--bound', 16,
         '--log_point_movement',
     ]

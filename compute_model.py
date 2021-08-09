@@ -121,7 +121,7 @@ def main(cfg):
     refiner_dict = cfg.method_dict[cur_key].get('keypoint_refinement', {})
     if refiner_dict.get('enabled', False):
         keypoints_dict = run_keypoint_refinement(
-            cfg, geom_path, keypoints_dict, matches_dict)
+            cfg, refiner_dict, geom_path, keypoints_dict, matches_dict)
 
     # Feature Matching
     print('Computing model')

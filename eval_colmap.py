@@ -182,7 +182,8 @@ def run_colmap_for_bag(cfg, colmap_path, refiner_dict={}):
     # Keypoint refinement
     if refiner_dict.get('enabled', False):
         keypoints = run_keypoint_refinement(
-                cfg, colmap_output_path, keypoints_dict, matches_dict,
+                cfg, refiner_dict, colmap_output_path, keypoints_dict,
+                matches_dict,
                 [i.split('/')[-1] for i in image_subset_list])
 
     # Copy images
