@@ -19,7 +19,7 @@ from utils.path_helper import (get_colmap_output_path, get_colmap_pose_file,
                                get_match_similarity_file,
                                get_filter_similarity_file)
 
-refiner_root = None
+refiner_root = '/home/psarlin/work/geometry/FeatureMetricSfM'
 cache_root = os.path.join(refiner_root, 'cache')
 bundle_refiner = os.path.join(refiner_root, 'build/fmcolmap')
 keypoint_refiner = os.path.join(
@@ -52,13 +52,40 @@ def run_bundle_refinement_for_bag(cfg, refiner_dict, initial_output_path):
     os.environ['TMPDIR'] = str(cache_dir)
 
     refiner_args = {
+        'default': {
+            "--Featuremap.type":"python128",
+            "--Featuremap.dtype":"half",
+            "--Featuremap.python_levels": refiner_dict.get('num_levels', 1),
+            "--FeatureBundleAdjustment.optimization_mode": "0",
+            "--Featuremap.interpolation_mode": "1",
+            '--FeatureBundleAdjustment.use_embedded_point_iterations': "1",
+            "--FeatureBundleAdjustment.feature_loss_function":"geman",
+            "--FeatureBundleAdjustment.feature_loss_function_scale": "0.1",
+            "--Featuremap.batch_size": "100",
+            "--Featuremap.sparse": "0",
+            "--Featuremap.extract_squared_distance_maps": "0",
+            "--Featuremap.sparse_patch_size": "16",
+            "--FeatureBundleAdjustment.point_optimization_enabled": "0",
+            "--FeatureBundleAdjustment.feature_regularization_enabled": "0",
+            "--FeatureBundleAdjustment.feature_regularization_track_weighting": "0",
+            "--FeatureBundleAdjustment.point_loss_function":"geman",
+            "--FeatureBundleAdjustment.point_loss_function_scale":"0.1",
+            "--FeatureBundleAdjustment.point_loss_function_magnitude":"1.0",
+            "--FeatureBundleAdjustment.berhu_slope":"0.5",
+            "--FeatureBundleAdjustment.max_num_iterations":"50",
+            "--patch_size": "1",
+        },
     }
 
     cmd = [
-        bundle_refiner,
+        bundle_refiner, 'feature_bundle_adjuster',
         '--image_path', str(image_path),
         '--input_path', str(initial_model),
         '--output_path', str(output_model),
+        '--FeatureBundleAdjustment.refine_focal_length', '1',
+        '--FeatureBundleAdjustment.refine_principal_point', '0',
+        '--FeatureBundleAdjustment.refine_extra_params', '1',
+        '--FeatureBundleAdjustment.refine_extrinsics', '1',
         '--Featuremap.cache_path', str(cache_dir),
         '--Featuremap.load_from_cache', '1',
         '--Featuremap.write_to_cache', '0',
