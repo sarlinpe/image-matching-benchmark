@@ -130,6 +130,7 @@ def import_features(cfg, data_list):
         fn_scale = os.path.join(cfg.path_features, _data, 'scales.h5')
         fn_ori = os.path.join(cfg.path_features, _data, 'orientations.h5')
         fn_match = os.path.join(cfg.path_features, _data, 'matches.h5')
+        fn_sim = os.path.join(cfg.path_features, _data, 'similarities.h5')
         fn_multiview_match = os.path.join(cfg.path_features, _data, 'matches_multiview.h5')
         fn_stereo_match_list = [os.path.join(cfg.path_features, _data,'matches_stereo_{}.h5').
             format(idx) for idx in range(3)]
@@ -247,6 +248,8 @@ def import_features(cfg, data_list):
                 print('------ Only one match file is provided for both stereo and multiview tasks')
 
             copy(fn_match,os.path.join(match_folder_path,'matches.h5'))
+            if os.path.isfile(fn_sim):
+                copy(fn_sim, match_folder_path)
             # make dummy cost file
             with h5py.File(os.path.join(match_folder_path,'matching_cost.h5'),'w') as h5_w:
                 h5_w.create_dataset('cost', data=0.0)
@@ -257,6 +260,8 @@ def import_features(cfg, data_list):
                 os.makedirs(filter_folder_path)
             # copy match file to post filter folder
             copy(fn_match,os.path.join(filter_folder_path,'matches_inlier.h5'))
+            if os.path.isfile(fn_sim):
+                copy(fn_sim,os.path.join(filter_folder_path,'similarities_inlier.h5'))
             # make dummy cost file
             with h5py.File(os.path.join(filter_folder_path,'matches_inlier_cost.h5'),'w') as h5_w:
                 h5_w.create_dataset('cost', data=0.0)
