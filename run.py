@@ -153,7 +153,7 @@ def main(cfg):
 
     # Read data and splits
     for dataset in ['phototourism']:
-        for subset in ['val', 'test']:
+        for subset in ['val', 'test', 'val2']:
             setattr(cfg, 'scenes_{}_{}'.format(dataset, subset),
                     './json/data/{}_{}.json'.format(dataset, subset))
             setattr(cfg, 'splits_{}_{}'.format(dataset, subset),

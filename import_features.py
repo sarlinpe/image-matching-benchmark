@@ -380,8 +380,12 @@ if __name__ == '__main__':
     seqs = []
     if cfg.subset == 'spc-fix':
         seqs += ['st_pauls_cathedral']
-    elif cfg.subset in ['val', 'test', 'both']:
-        if cfg.subset in ['val', 'both']:
+    elif cfg.subset in ['val', 'test', 'both', 'val2']:
+        if cfg.subset == 'val2':
+            with open(os.path.join('json', 'data',
+                                   'phototourism_val2.json')) as f:
+                seqs += json.load(f)
+        elif cfg.subset in ['val', 'both']:
             with open(os.path.join('json', 'data',
                                    'phototourism_val.json')) as f:
                 seqs += json.load(f)

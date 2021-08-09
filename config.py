@@ -219,7 +219,7 @@ arg.add_argument('--viz_composite_vert',
 arg.add_argument('--subset',
                  type=str,
                  default=None,
-                 choices=['val', 'test'],
+                 choices=['val', 'test', 'val2'],
                  help='Data subset: "val" or "test"')
 
 # run settings
@@ -233,6 +233,18 @@ arg.add_argument('--num_runs_val_multiview',
                  default=1,
                  help='Number of validation runs (multiview)')
 arg.add_argument('--num_runs_val_relocalization',
+                 type=int,
+                 default=1,
+                 help='Number of validation runs (relocalization)')
+arg.add_argument('--num_runs_val2_stereo',
+                 type=int,
+                 default=1,
+                 help='Number of validation runs (stereo)')
+arg.add_argument('--num_runs_val2_multiview',
+                 type=int,
+                 default=1,
+                 help='Number of validation runs (multiview)')
+arg.add_argument('--num_runs_val2_relocalization',
                  type=int,
                  default=1,
                  help='Number of validation runs (relocalization)')
@@ -271,7 +283,7 @@ arg.add_argument('--bag_size', type=int, default=-1, help='')
 arg.add_argument('--bag_id', type=int, default=-1, help='')
 arg.add_argument('--task', type=str, default='', help='')
 for dataset in ['phototourism']:
-    for subset in ['val', 'test']:
+    for subset in ['val', 'test', 'val2']:
         arg.add_argument('--scenes_{}_{}'.format(dataset, subset),
                          type=str,
                          default='',
@@ -631,7 +643,9 @@ def get_config():
     # Overwrite the options by explicitly selecting val/test
     # Hacky but convenient
     if cfg.subset == 'val':
-        cfg.path_pack = 'packed-val'
+        cfg.path_pack = 'packed-val-iccv2021'
+    elif cfg.subset == 'val2':
+        cfg.path_pack = 'packed-val3'
     elif cfg.subset == 'test':
         cfg.path_pack = 'packed-test'
     else:
