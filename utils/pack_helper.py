@@ -296,7 +296,7 @@ def compute_qt_auc_colmap(res_dict, deprecated_images, cfg):
     qt_hist_list = np.empty([0, 10])
     for bag_id in range(get_num_in_bag(cfg_bag)):
         cfg_bag.bag_id = bag_id
-        
+
         # Skip if bag contains deprecated images
         if not valid_bag(cfg_bag, deprecated_images):
             continue
@@ -442,7 +442,10 @@ def compute_num_input_matches(res_dict, deprecated_images, cfg):
                     pairs.append('-'.join(
                         sorted([keys[i], keys[j]], reverse=True)))
             for pair in pairs:
-                num_input_matches_bagsize.append(matches_dict[pair].shape[-1])
+                if pair not in matches_dict:
+                    print(f'Warning: cannot find pair {pair}', bag_id)
+                else:
+                    num_input_matches_bagsize.append(matches_dict[pair].shape[-1])
         num_input_matches.append(np.mean(num_input_matches_bagsize))
 
     res_dict['num_input_matches'] = np.mean(num_input_matches)
