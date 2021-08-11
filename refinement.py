@@ -3,8 +3,9 @@ import h5py
 import subprocess
 import numpy as np
 from shutil import rmtree
+from pathlib import Path
 
-from utils.io_helper import load_h5
+from utils.io_helper import load_h5, save_h5
 from utils.colmap_helper import (compute_stereo_metrics_from_colmap,
                                  get_best_colmap_index,
                                  get_colmap_image_path_list,
@@ -14,16 +15,123 @@ from utils.path_helper import (get_colmap_output_path, get_colmap_pose_file,
                                get_colmap_temp_path, get_item_name_list,
                                get_kp_file, get_match_file, get_fullpath_list,
                                get_data_path, get_filter_match_file,
-                               get_colmap_path,
+                               get_colmap_path, parse_file_to_list,
                                get_feature_path, get_match_path,
                                get_match_similarity_file,
                                get_filter_similarity_file)
 
-refiner_root = '/home/psarlin/work/geometry/FeatureMetricSfM'
-cache_root = os.path.join(refiner_root, 'cache')
-bundle_refiner = os.path.join(refiner_root, 'build/fmcolmap')
-keypoint_refiner = os.path.join(
-    refiner_root, 'build/src/PreSfMRefinement/pre_sfm_refinement')
+import pycolmap
+import pixsfm
+import pixsfm.refine_keypoints, pixsfm.refine_reconstruction
+
+
+base_config = {
+    'extractor': 's2dnet',
+    'feature_config': {
+        "sparse": False,
+        "pyr_scales": [1.0],
+        "max_edge": 1600,
+        "patch_size": 16,
+        "device": "cuda",
+        "dtype": "half",
+        "store_h5": True,
+        "load_h5_if_exists": True,
+        "h5_format": "chunked"
+    },
+    'interpolation_config': {
+        'l2_normalize': True,
+        'ncc_normalize': False,
+        'nodes': [[0.0, 0.0]],
+        'type': 'bicubic'
+    },
+    'ka_setup': {
+        'level_order': 'all',
+        'max_tracks_per_problem': 10,
+        'num_threads': 16,
+        'ka_options': {
+            'bound': 20.0,
+            'loss': {'name': 'cauchy', 'params': [0.25]},
+            'num_solver_threads': 1,
+            'print_summary': False,
+            'root_regularize_weight': 0.5,
+            'solver_options': {
+                'function_tolerance': 0.0,
+                'gradient_tolerance': 0.0,
+                'inner_iteration_tolerance': 1e-05,
+                'max_num_consecutive_invalid_steps': 10,
+                'max_num_iterations': 100,
+                'minimizer_progress_to_stdout': False,
+                'parameter_tolerance': 1e-05,
+                'update_state_every_iteration': False,
+                'use_inner_iterations': False,
+                'use_nonmonotonic_steps': False
+            }
+        },
+    },
+    'ba_setup': {
+        'repeats': 1,
+        'level_order': 'all',
+        'max_tracks_per_problem': 10,
+        'num_threads': -1,
+        'reference_config': {
+            'compute_all_scores': False,
+            'compute_offsets3D': False,
+            'iters': 100,
+            'loss': {'name': 'cauchy', 'params': [0.25]}
+        },
+        'costmap_config': {
+            'loss': {'name': 'trivial', 'params': []}
+        },
+        'ba_options': {
+            'loss': {'name': 'cauchy', 'params': [0.25]},
+            'solver_options': {
+                'function_tolerance': 0.0,
+                'gradient_tolerance': 0.0,
+                'max_consecutive_nonmonotonic_steps': 10,
+                'max_linear_solver_iterations': 200,
+                'max_num_consecutive_invalid_steps': 10,
+                'max_num_iterations': 10,
+                'minimizer_progress_to_stdout': True,
+                'parameter_tolerance': 0.0,
+                'use_inner_iterations': True,
+                'use_nonmonotonic_steps': False,
+            },
+            'print_summary': True,
+            'refine_extra_params': True,
+            'refine_extrinsics': True,
+            'refine_focal_length': True,
+            'refine_principal_point': False,
+        },
+    },
+}
+
+
+def get_features(cfg, ref_cfg):
+    feature_cfg = ref_cfg['feature_config']
+    cache_name = f"{ref_cfg['extractor']}_resize{feature_cfg['max_edge']}"
+    cache_dir = os.path.join(cfg.path_data, "cache", cache_name, cfg.dataset)
+    cache_path = os.path.join(cache_dir, cfg.scene + '.h5')
+    os.makedirs(cache_dir, exist_ok=True)
+
+    # TODO: not needed if flag load_h5_if_exists ?
+    if os.path.exists(cache_path):
+        return pixsfm.extract.load_features_from_h5(Path(cache_path))
+
+    data_dir = get_data_path(cfg)
+    image_paths = get_fullpath_list(data_dir, 'images')
+    names = [os.path.basename(path) for path in image_paths]
+    image_dir = os.path.join(data_dir, 'images')
+
+    extractor = pixsfm.extract.load_extractor(
+            ref_cfg['extractor'], feature_cfg["device"])
+    manager = pixsfm.extract.features_from_image_list(
+        extractor,
+        feature_cfg,
+        Path(image_dir),
+        names,
+        h5_path=Path(cache_path),
+    )
+    return manager
 
 
 def run_bundle_refinement_for_bag(cfg, refiner_dict, initial_output_path):
@@ -36,92 +144,49 @@ def run_bundle_refinement_for_bag(cfg, refiner_dict, initial_output_path):
         return
 
     best_index = get_best_colmap_index(cfg, initial_output_path)
-    initial_model = os.path.join(initial_output_path, str(best_index))
+    initial_model_path = os.path.join(initial_output_path, str(best_index))
 
     refine_output_path = get_colmap_output_path(cfg)
     if os.path.exists(refine_output_path):
         print(' -- already exists, skipping refine session')
         return
-    output_model = os.path.join(refine_output_path, str(best_index))
-    os.makedirs(output_model)
-    image_path = os.path.join(get_data_path(cfg), 'images')
+    output_model_path = os.path.join(refine_output_path, str(best_index))
+    os.makedirs(output_model_path)
 
-    cache_dir = os.path.join(cache_root, cfg.dataset, cfg.scene)
-    if not os.path.exists(cache_dir):
-        raise RuntimeError(f'Cache does not exists at {cache_dir}')
-    os.environ['TMPDIR'] = str(cache_dir)
-
-    refiner_args = {
-        'default': {
-            "--Featuremap.type":"python128",
-            "--Featuremap.dtype":"half",
-            "--Featuremap.python_levels": refiner_dict.get('num_levels', 1),
-            "--FeatureBundleAdjustment.optimization_mode": "0",
-            "--Featuremap.interpolation_mode": "1",
-            '--FeatureBundleAdjustment.use_embedded_point_iterations': "1",
-            "--FeatureBundleAdjustment.feature_loss_function":"geman",
-            "--FeatureBundleAdjustment.feature_loss_function_scale": "0.1",
-            "--Featuremap.batch_size": "100",
-            "--Featuremap.sparse": "0",
-            "--Featuremap.extract_squared_distance_maps": "0",
-            "--Featuremap.sparse_patch_size": "16",
-            "--FeatureBundleAdjustment.point_optimization_enabled": "0",
-            "--FeatureBundleAdjustment.feature_regularization_enabled": "0",
-            "--FeatureBundleAdjustment.feature_regularization_track_weighting": "0",
-            "--FeatureBundleAdjustment.point_loss_function":"geman",
-            "--FeatureBundleAdjustment.point_loss_function_scale":"0.1",
-            "--FeatureBundleAdjustment.point_loss_function_magnitude":"1.0",
-            "--FeatureBundleAdjustment.berhu_slope":"0.5",
-            "--FeatureBundleAdjustment.max_num_iterations":"50",
-            "--patch_size": "1",
-        },
-    }
-
-    cmd = [
-        bundle_refiner, 'feature_bundle_adjuster',
-        '--image_path', str(image_path),
-        '--input_path', str(initial_model),
-        '--output_path', str(output_model),
-        '--FeatureBundleAdjustment.refine_focal_length', '1',
-        '--FeatureBundleAdjustment.refine_principal_point', '0',
-        '--FeatureBundleAdjustment.refine_extra_params', '1',
-        '--FeatureBundleAdjustment.refine_extrinsics', '1',
-        '--Featuremap.cache_path', str(cache_dir),
-        '--Featuremap.load_from_cache', '1',
-        '--Featuremap.write_to_cache', '0',
-    ]
-    args = refiner_args['default']
-    cmd += [x for kv in args.items() for x in kv]
-    cmd = list(map(str, cmd))
-    print('Refinement arguments:\n' + (' '.join(cmd)))
-
-    ret = subprocess.call(cmd)
-    if ret != 0:
+    ref_cfg = base_config
+    feature_manager = get_features(cfg, ref_cfg)
+    try:
+        model = pycolmap.Reconstruction(str(initial_model_path))
+        model, _ = pixsfm.refine_reconstruction.solve(
+            model,
+            feature_manager,
+            ref_cfg["interpolation_config"],
+            ref_cfg["ba_setup"],
+            strategy='feature_bundle_adjustment',
+        )
+        model.write(str(output_model_path))
+        print('FBA:', model.summary())
+    except Exception as e:
+        print('Problem with the refiner, exiting.')
         rmtree(refine_output_path)
-        raise RuntimeError('Problem with the refiner, exiting.')
+        raise e
 
 
-def create_refiner_match_file(imw_matches, imw_sim, path):
-    with h5py.File(str(path), "w") as h5f:
-        for i, (k, matches) in enumerate(imw_matches.items()):
-            name1, name2 = k.split('-')
-            sim = imw_sim[k].astype(np.float32)
-            assert np.all(matches >= 0)
-            matches = matches.astype(np.uint32).T
-            group = h5f.create_group(str(i))
-            if not len(matches) == len(sim):
-                print(len(matches), len(sim))
-                import ipdb; ipdb.set_trace()
-            group.create_dataset("similarities", data=sim, dtype="float32")
-            group.create_dataset("matches", data=matches, dtype="uint32")
-            group.attrs["image_name1"] = name1 + '.jpg'
-            group.attrs["image_name2"] = name2 + '.jpg'
-
-
-def create_refiner_keypoint_file(imw_keypoints, path):
-    with h5py.File(str(path), "w") as h5f:
-        for name, kpts in imw_keypoints.items():
-            h5f.create_dataset(name + '.jpg', data=kpts, dtype="float64")
+def build_graph(matches, similarities, images=None):
+    graph = pixsfm.base.Graph()
+    for pair, mat in matches.items():
+        prefix1, prefix2 = pair.split('-')
+        name1 = prefix1 + '.jpg'
+        name2 = prefix2 + '.jpg'
+        if images is not None:
+            if not (name1 in images and name2 in images):
+                continue
+        sim = similarities[pair].astype(np.float32)
+        mat = mat.astype(np.uint64).T
+        assert np.all(mat >= 0)
+        assert len(mat) == len(sim)
+        graph.register_matches(name1, name2, mat, sim)
+    return graph
 
 
 def run_keypoint_refinement(cfg, refiner_dict, output_dir,
@@ -135,50 +200,28 @@ def run_keypoint_refinement(cfg, refiner_dict, output_dir,
                     f'Match similarities do not exist at {similarity_path}')
     similarity_dict = load_h5(similarity_path)
 
-    input_keypoints_path = os.path.join(
-            get_feature_path(cfg), 'keypoints_for_refiner.h5')
-    if not os.path.exists(input_keypoints_path):
-        create_refiner_keypoint_file(raw_keypoints_dict, input_keypoints_path)
+    keypoints = pixsfm.base.MapNameNpArrayDouble()
+    for name, k in raw_keypoints_dict.items():
+        keypoints[name+'.jpg'] = k.astype(np.float64)
+    if image_subset is not None:
+        image_subset = set(image_subset)
+        for n in keypoints:
+            if n not in image_subset:
+                del keypoints[n]
 
-    input_matches_path = os.path.join(
-            get_match_path(cfg), 'matches_for_refiner.h5')
-    if not os.path.exists(input_matches_path):
-        print(similarity_path, input_matches_path, get_filter_match_file(cfg))
-        create_refiner_match_file(
-                matches_dict, similarity_dict, input_matches_path)
+    ref_cfg = base_config
+    feature_manager = get_features(cfg, ref_cfg)
+    graph = build_graph(matches_dict, similarity_dict, image_subset)
+    keypoints = pixsfm.refine_keypoints.solve(
+        graph,
+        keypoints,
+        feature_manager,
+        ref_cfg["interpolation_config"],
+        ref_cfg["ka_setup"],
+        strategy='topological_keypoint_adjustment')
 
     ref_keypoints_path = os.path.join(output_dir, 'keypoints_refined.h5')
-
-    cache_dir = os.path.join(refiner_root, 'cache', cfg.dataset, cfg.scene)
-    if not os.path.exists(cache_dir):
-        raise RuntimeError(f'Cache does not exists at {cache_dir}')
-    os.environ['TMPDIR'] = str(cache_dir)
-    cache_file = os.path.join(cache_dir, 'fmaps_python128_.h5')
-
-    cmd = [
-        keypoint_refiner,
-        '--matches_file', input_matches_path,
-        '--keypoints_file', input_keypoints_path,
-        '--cache_file', cache_file,
-        '--output_file', ref_keypoints_path,
-        '--n_threads', 12,
-        '--n_levels', refiner_dict.get('num_levels', 1),
-        '--bound', 16,
-        '--log_point_movement',
-    ]
-    if image_subset is not None:
-        all_images = [i+'.jpg' for i in raw_keypoints_dict]
-        holdout = list(set(all_images) - set(image_subset))
-        cmd += ['--holdout_images'] + holdout
-    # import ipdb; ipdb.set_trace()
-
-    cmd = list(map(str, cmd))
-    print('Running keypoint refinement with arguments:\n' + (' '.join(cmd)))
-    ret = subprocess.call(cmd)
-    if ret != 0:
-        raise RuntimeError('Problem with keypoint refiner, exiting.')
-
-    ref_keypoints = load_h5(ref_keypoints_path)
-    ref_keypoints = {
-            os.path.splitext(k)[0]: v for k, v in ref_keypoints.items()}
-    return ref_keypoints
+    save_h5(keypoints, ref_keypoints_path)
+    ref_keypoints_dict = {
+            os.path.splitext(k)[0]: v for k, v in keypoints.items()}
+    return ref_keypoints_dict

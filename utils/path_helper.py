@@ -291,7 +291,7 @@ def get_geom_name(cfg):
     cur_key = 'config_{}_{}'.format(cfg.dataset, cfg.task)
     kp_ref = cfg.method_dict[cur_key].get('keypoint_refinement', {})
     if kp_ref.get('enabled', False):
-        label += '_refine-' + kp_ref['label']
+        label += '_refine2-' + kp_ref['label']
 
     return label.lower()
 
@@ -433,9 +433,9 @@ def get_colmap_path(cfg):
     bundle_ref = cfg.method_dict[cur_key].get('bundle_refinement', {})
     kp_ref = cfg.method_dict[cur_key].get('keypoint_refinement', {})
     if kp_ref.get('enabled', False):
-        path = os.path.join(path, 'colmap_kptref_' + kp_ref['label'])
+        path = os.path.join(path, 'colmap_krefine2_' + kp_ref['label'])
     if bundle_ref.get('enabled', False):
-        path = os.path.join(path, 'refined_' + bundle_ref['label'])
+        path = os.path.join(path, 'brefine2_' + bundle_ref['label'])
     return path
 
 

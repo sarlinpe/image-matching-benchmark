@@ -399,7 +399,6 @@ def validate_method(method, is_challenge):
             Optional('keypoint_refinement'): {
                 'enabled': bool,
                 'label': And(Use(str), lambda v: len(v) > 0),
-                Optional('num_levels'): int,
             },
         },
         Optional('config_phototourism_multiview'): {
@@ -444,12 +443,10 @@ def validate_method(method, is_challenge):
             Optional('bundle_refinement'): {
                 'enabled': bool,
                 'label': And(Use(str), lambda v: len(v) > 0),
-                Optional('num_levels'): int,
             },
             Optional('keypoint_refinement'): {
                 'enabled': bool,
                 'label': And(Use(str), lambda v: len(v) > 0),
-                Optional('num_levels'): int,
             },
         },
         Optional('config_phototourism_relocalization'): {},
@@ -646,9 +643,9 @@ def get_config():
     # Overwrite the options by explicitly selecting val/test
     # Hacky but convenient
     if cfg.subset == 'val':
-        cfg.path_pack = 'packed-val-iccv2021'
+        cfg.path_pack = 'packed-refine2-test'
     elif cfg.subset == 'val2':
-        cfg.path_pack = 'packed-val3'
+        cfg.path_pack = 'packed-refine2-val'
     elif cfg.subset == 'test':
         cfg.path_pack = 'packed-test'
     else:
